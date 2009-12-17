@@ -28,6 +28,7 @@
 package org.flexunit.runners {
 	import org.flexunit.internals.AssumptionViolatedException;
 	import org.flexunit.internals.runners.model.EachTestNotifier;
+	import org.flexunit.internals.runners.statements.AbortableTestStatementSequencer;
 	import org.flexunit.internals.runners.statements.ExpectAsync;
 	import org.flexunit.internals.runners.statements.ExpectException;
 	import org.flexunit.internals.runners.statements.Fail;
@@ -291,7 +292,8 @@ package org.flexunit.runners {
 				return new Fail(e);
 			}
 
-			var sequencer:StatementSequencer = new StatementSequencer();
+			var sequencer:StatementSequencer = new AbortableTestStatementSequencer();
+			//var sequencer:StatementSequencer = new StatementSequencer();
 			
 			sequencer.addStep( withBefores( method, test) );
 			sequencer.addStep( withDecoration( method, test ) );

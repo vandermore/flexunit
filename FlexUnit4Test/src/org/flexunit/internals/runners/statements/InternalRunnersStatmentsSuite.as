@@ -1,5 +1,6 @@
 package org.flexunit.internals.runners.statements
 {
+	import org.flexunit.internals.runners.statements.cases.AbortableTestStatementSequencerCase;
 	import org.flexunit.internals.runners.statements.cases.AsyncStatementBaseCase;
 	import org.flexunit.internals.runners.statements.cases.ExpectAsyncASCase;
 	import org.flexunit.internals.runners.statements.cases.ExpectExceptionCase;
@@ -18,6 +19,7 @@ package org.flexunit.internals.runners.statements
 	[RunWith("org.flexunit.runners.Suite")]
 	public class InternalRunnersStatmentsSuite
 	{
+		public var abortableTestStatementSequencerCase:AbortableTestStatementSequencerCase;
 		public var asyncStatementBaseCase:AsyncStatementBaseCase;
 		public var expectAsyncCase:ExpectAsyncASCase;
 		public var expectExceptionCase:ExpectExceptionCase;

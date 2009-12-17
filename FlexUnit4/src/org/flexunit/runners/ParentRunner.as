@@ -32,6 +32,7 @@ package org.flexunit.runners {
 	import org.flexunit.internals.runners.ErrorReportingRunner;
 	import org.flexunit.internals.runners.InitializationError;
 	import org.flexunit.internals.runners.model.EachTestNotifier;
+	import org.flexunit.internals.runners.statements.AbortableTestStatementSequencer;
 	import org.flexunit.internals.runners.statements.IAsyncStatement;
 	import org.flexunit.internals.runners.statements.RunAftersClass;
 	import org.flexunit.internals.runners.statements.RunBeforesClass;
@@ -216,7 +217,8 @@ package org.flexunit.runners {
 		 * @see #runChild()
 		 */
 		protected function classBlock( notifier:IRunNotifier ):IAsyncStatement {
-			var sequencer:StatementSequencer = new StatementSequencer();
+			var sequencer:StatementSequencer = new AbortableTestStatementSequencer();
+			//var sequencer:StatementSequencer = new StatementSequencer();
 			
 			sequencer.addStep( withBeforeClasses() );
 			sequencer.addStep( childrenInvoker( notifier ) );
