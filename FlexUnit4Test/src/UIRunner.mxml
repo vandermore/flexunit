@@ -5,18 +5,19 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import org.flexunit.listeners.UIListener;
 			import compilationSuite.SuitesToRun;
 			
-			import org.flexunit.listeners.CIListener;
+			import org.flexunit.events.rule.EventRuleSuite;
+			import org.flexunit.events.rule.cases.SyncEventTesting;
 			import org.flexunit.runner.FlexUnitCore;
 			
 			private var core:FlexUnitCore;
-			
+
 			public function runMe():void {
 				core = new FlexUnitCore();
-				core.addListener(new UIListener(uiListener));
-				core.run( compilationSuite.SuitesToRun );
+				core.addUncaughtErrorListener( systemManager.loaderInfo );
+				core.addListener( uiListener );
+				core.run( SuitesToRun );
 			}
 		]]>
 	</mx:Script>

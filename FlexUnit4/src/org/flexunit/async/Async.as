@@ -28,8 +28,9 @@
 package org.flexunit.async
 {
 	import flash.events.IEventDispatcher;
-	
-	import mx.rpc.IResponder;
+	import flash.events.TimerEvent;
+	import flash.net.Responder;
+	import flash.utils.Timer;
 	
 	import org.flexunit.internals.runners.statements.IAsyncHandlingStatement;
 	
@@ -179,19 +180,60 @@ package org.flexunit.async
 		/**
 		 * This method works in a similar fashion to handleEvent, however, it is intended to work with AsyncTokens and Responders as opposed to events. 
 		 * 
+		 * @param testCase: The current asynchronous test case.
+		 * @param responder: The responder that will be executed if the <code>timemout</code> period has not been reached.
+		 * @param timeout: The length of time, in milliseconds, before calling the <code>timeoutHandler</code>
+		 * if the rpc event hasn't been dispatched yet.
+		 * @param passThroughData: An Object that can be given information about the current test, this information will be 
+		 * available to both the responder and the <code>timeoutHandler</code>.
+		 * @param timeoutHandler: The function that will be executed if the <code>timeout</code> period is reached.
+		 */
+		CONFIG::useFlexClasses {
+		import mx.rpc.IResponder;
+		
+		public static function asyncResponder( testCase:Object, responder:*, timeout:int, passThroughData:Object = null, timeoutHandler:Function = null ):IResponder {
+			var asyncHandlingStatement:IAsyncHandlingStatement = AsyncLocator.getCallableForTest( testCase );
+			
+			return asyncHandlingStatement.asyncResponder( responder, timeout, passThroughData, timeoutHandler );
+		}
+		}
+		/**
+		 * This method works in a similar fashion to handleEvent, however, it is intended to work with AsyncTokens and Responders as opposed to events. 
+		 * 
 		 * @param testCase The current asynchronous test case.
-		 * @param responder The responder that will be executed if the <code>timemout</code> period has not been reached.
+		 * @param resultHandler The function that will be executed if the <code>timeout</code> period has not been reached and we have a success.
+		 * @param faultHandler The function that will be executed if the <code>timeout</code> period has not been reached and we have an error.
 		 * @param timeout The length of time, in milliseconds, before the calling the <code>timeoutHandler</code>
 		 * if the <code>eventName</code> event is not dispatched.
 		 * @param passThroughData An Object that can be given information about the current test, this information will be 
 		 * available to both the <code>eventHandler</code> and <code>timeoutHandler</code>.
 		 * @param timeoutHandler The function that will be executed if the <code>timeout</code> period is reached.
 		 */
-		CONFIG::useFlexClasses
-		public static function asyncResponder( testCase:Object, responder:*, timeout:int, passThroughData:Object = null, timeoutHandler:Function = null ):IResponder {
+		public static function asyncNativeResponder( testCase:Object, resultHandler : Function, faultHandler : Function, timeout:int, passThroughData:Object = null, timeoutHandler:Function = null ) : Responder {
 			var asyncHandlingStatement:IAsyncHandlingStatement = AsyncLocator.getCallableForTest( testCase );
 			
-			return asyncHandlingStatement.asyncResponder( responder, timeout, passThroughData, timeoutHandler );
+			return asyncHandlingStatement.asyncNativeResponder( resultHandler, faultHandler, timeout, passThroughData, timeoutHandler );
+		}
+		
+		/**
+		 * Calls a method after a given delay. 
+		 * @param testCase The current asynchronous test case.
+		 * @param callback The function that will be executed if the <code>delay</code> has been reached.
+		 * @param delay The length of time, in milliseconds, before calling the <code>callback</code>.
+		 */		
+		public static function delayCall(testCase:Object, callback:Function, delay:Number):void
+		{
+			var asyncHandlingStatement:IAsyncHandlingStatement = AsyncLocator.getCallableForTest( testCase );
+			var timer:Timer = new Timer(delay, 1);
+			var handler:Function;
+                   
+			handler = asyncHandlingStatement.asyncHandler( function(event:TimerEvent, object:Object):void
+			{
+				callback();
+			}, delay + 100.0);
+			
+			timer.addEventListener( TimerEvent.TIMER_COMPLETE, handler, false, 0, true );
+			timer.start();
 		}
 	}
 }

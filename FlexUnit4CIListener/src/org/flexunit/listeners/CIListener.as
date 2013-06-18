@@ -45,9 +45,10 @@ package org.flexunit.listeners
 	import org.flexunit.runner.Result;
 	import org.flexunit.runner.notification.Failure;
 	import org.flexunit.runner.notification.IAsyncStartupRunListener;
+	import org.flexunit.runner.notification.ITemporalRunListener;
 	import org.flexunit.runner.notification.async.AsyncListenerWatcher;
 	
-	public class CIListener extends EventDispatcher implements IAsyncStartupRunListener
+	public class CIListener extends EventDispatcher implements IAsyncStartupRunListener, ITemporalRunListener
 	{
 		protected static const DEFAULT_PORT : uint = 1024;
 		protected static const DEFAULT_SERVER : String = "127.0.0.1";
@@ -77,6 +78,7 @@ package org.flexunit.listeners
 		
 		private var lastFailedTest:IDescription;
 		private var timeOut:Timer;
+		private var lastTestTime:Number = 0;
 		
 		public function CIListener(port : uint = DEFAULT_PORT, server : String = DEFAULT_SERVER) 
 		{
@@ -106,7 +108,7 @@ package org.flexunit.listeners
 		}
 		
 		private function declareBroken( event:TimerEvent ):void {
-			errorHandler( new Event( 'broken') );
+			errorHandler( new Event( "broken") );
 		}
 		
 		[Bindable(event="listenerReady")]
@@ -123,6 +125,19 @@ package org.flexunit.listeners
 		private function getTestCount( description:IDescription ):int 
 		{
 			return description.testCount;
+		}
+
+		public function testTimed( description:IDescription, runTime:Number ):void {
+			if(!runTime || isNaN(runTime))
+         {
+            lastTestTime = 0;
+         }
+         else
+         {
+            lastTestTime = runTime;
+         }
+         
+			//trace( description.displayName + " took " + runTime + " ms " );
 		}
 		
 		public function testRunStarted( description:IDescription ):void
@@ -147,7 +162,7 @@ package org.flexunit.listeners
 			// called after each test
 			if(!lastFailedTest || description.displayName != lastFailedTest.displayName){
 				var desc:Descriptor = getDescriptorFromDescription(description);
-				sendResults("<testcase classname='"+desc.suite+"' name='"+desc.method+"' time='0.000'  status='"+SUCCESS+"'/>");
+				sendResults("<testcase classname=\""+desc.suite+"\" name=\""+desc.method+"\" time=\"" + lastTestTime  + "\" status=\""+SUCCESS+"\" />");
 			}
 		}
 		
@@ -162,7 +177,7 @@ package org.flexunit.listeners
 			var descriptor:Descriptor = getDescriptorFromDescription(description);
 
 			var xml:String =
-				"<testcase classname='"+descriptor.suite+"' name='"+descriptor.method+"' time='0.000' status='"+IGNORE+"'>"
+				"<testcase classname=\""+descriptor.suite+"\" name=\""+descriptor.method+"\" time=\"" + lastTestTime  + "\" status=\""+IGNORE+"\">"
 				+ "<skipped />"
 				+ "</testcase>";
 
@@ -191,8 +206,8 @@ package org.flexunit.listeners
 			if(FailureFormatter.isError(failure.exception)) 
 			{
 				xml =
-					"<testcase classname='"+descriptor.suite+"' name='"+descriptor.method+"' time='0.000'  status='"+ERROR+"'>"
-					+ "<error message='" + message + "' type='"+ type +"' >"
+					"<testcase classname=\""+descriptor.suite+"\" name=\""+descriptor.method+"\" time=\"" + lastTestTime  + "\" status=\""+ERROR+"\">"
+					+ "<error message=\"" + message + "\" type=\""+ type +"\" >"
 					+ "<![CDATA[" + stackTrace + "]]>"
 					+ "</error>"
 					+ "</testcase>";
@@ -200,8 +215,8 @@ package org.flexunit.listeners
 			else 
 			{
 				xml =
-					"<testcase classname='"+descriptor.suite+"' name='"+descriptor.method+"' time='0.000'  status='"+FAILURE+"'>"
-					+ "<failure message='" + message + "' type='"+ type +"' >"
+					"<testcase classname=\""+descriptor.suite+"\" name=\""+descriptor.method+"\" time=\"" + lastTestTime  + "\" status=\""+FAILURE+"\">"
+					+ "<failure message=\"" + message + "\" type=\""+ type +"\" >"
 					+ "<![CDATA[" + stackTrace + "]]>"
 					+ "</failure>"
 					+ "</testcase>";

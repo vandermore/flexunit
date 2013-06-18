@@ -28,6 +28,12 @@
 package flex.lang.reflect {
 	import flex.lang.reflect.metadata.MetaDataAnnotation;
 	
+	import org.flexunit.constants.AnnotationConstants;
+	
+	/**
+	 * An object representing a property or variable of a class or instance. You can gain access to the
+	 * value of the field as well as inspect its metadata. 
+	 */
 	public class Field {
 		/**
 		 * @private
@@ -62,7 +68,7 @@ package flex.lang.reflect {
 		 */
 		private var _isStatic:Boolean;
 		/**
-		 * Returns wether the <code>Field</code> is static or now
+		 * Returns whether the <code>Field</code> is static.
 		 */
 		public function get isStatic():Boolean {
 			return _isStatic;
@@ -73,26 +79,48 @@ package flex.lang.reflect {
 		 */
 		private var _isProperty:Boolean;
 		/**
-		 * Returns wether the <code>Field</code> is a propery field or not
+		 * Returns whether the <code>Field</code> is a property. Fields are either 
+		 * properties (getter/setters) or variables.
+		 * 
 		 */
 		public function get isProperty():Boolean {
 			return _isProperty;
 		}
 		
 		/**
-		 * Retrieves the Class associated with the object specified by the field name.
-		 *   If a null paramater is passed will instead retrieve the field defined by the field name
-		 * will instead return the Class defined by this field.
+		 * Returns the Class that defines this field.
+		 *  
+		 * @return a Class. 
 		 * 
-		 * @param obj The object
-		 * @return An object specified by name else the
+		 */		
+		public function get definedBy():Class {
+			return _definedBy;
+		}
+		
+		/**
+		 * Retrieves the actual field represented by this Field object within the instance or class 
+		 * where it exists. 
+		 * 
+		 * If an object is passed, then this field is returned from that object instance. 
+		 * 
+		 * If a null argument is passed and the field is static, then the field is treated as static and
+		 * returned from the class. 
+		 * 
+		 * If a null argument is passed and the field is NOT static, then an error is thrown.
+		 * 
+		 * @param obj An instance where the field exists
+		 * @return The object represented by this Field within the specified object or class. 
 		 */
-		public function getObj( obj:Object ):Object {
-			if ( obj == null ) {
+		public function getObj( obj:Object=null ):Object {
+			if ( isStatic && ( obj == null ) ) {
 				return _definedBy[ name ];
-			} else {
-				return obj[ name ];				
+			} 
+
+			if ( !isStatic && ( obj != null ) ) {
+				return obj[ name ];
 			}
+
+			throw new ArgumentError( "Attempting to access inaccessible field on object or class." );
 		}
 		
 		/**
@@ -103,16 +131,16 @@ package flex.lang.reflect {
 				return _elementType;
 			}
 			
-			var metaDataAnnotation:MetaDataAnnotation = getMetaData( "ArrayElementType" );
+			var metaDataAnnotation:MetaDataAnnotation = getMetaData( AnnotationConstants.ARRAY_ELEMENT_TYPE );
 			if ( ( type == Array ) && metaDataAnnotation && metaDataAnnotation.defaultArgument ) {
 				//we are an array at least, so let's go further;
 				var meta:String = metaDataAnnotation.defaultArgument.key;
 				
-				//TODO : Shouldn't this throw an error rather than tracing it?
 				try {
 					_elementType = Klass.getClassFromName( meta );
 				} catch ( error:Error ) {
-					trace("Cannot find specified ArrayElementType("+meta+") in SWF");
+					_elementType = null;
+					//trace("Cannot find specified ArrayElementType("+meta+") in SWF");
 				}
 					
 			}
@@ -121,7 +149,7 @@ package flex.lang.reflect {
 		}
 
 		/**
-		 * Retrieves the metadata of the <code>Field</code>
+		 * Retrieves an array of MetaDataAnnotation instances associated with the <code>Field</code>
 		 */
 		public function get metadata():Array {
 			if ( !_metaData ) {
@@ -138,25 +166,23 @@ package flex.lang.reflect {
 		}
 		
 		/**
-		 * Tests wether the <code>Field</code> has the metadata specified by name
+		 * Checks for the existance of a metadata annotation using the annotation's name
 		 * 
-		 * @param name Name of the requested metadata
+		 * @param name the name of the annotation
+		 * @return Returns true if the annotation exists, false if it does not.
 		 * 
-		 * @return <code>true</code> if <code>Field</code> has the metadata, else <code>false</code>.
+		 * @see #getMetaData()
 		 */
 		public function hasMetaData( name:String ):Boolean {
 			return ( getMetaData( name ) != null );
 		}
 		
 		/**
-		 * Retrieves the metadata associated with the <code>Field</code> having the paramater
-		 * name and the paramater key.  If no key is specified, returns the value associated with
-		 * the named metadata
+		 * Returns the MetaDataAnnotation associated with a given annotation using the annotation's name
+		 *  
+		 * @param name the name of the annotation
+		 * @return the MetaDataAnnotation instance for the annotation name, or null if it was not found.
 		 * 
-		 * @param name Name of the requested metadata
-		 * @param key Key matching the name (<code>null</code> ok)
-		 * 
-		 * @return Value of the corresponding metadata
 		 */
 		public function getMetaData( name:String ):MetaDataAnnotation {
 			var metadataAr:Array = metadata;
@@ -179,15 +205,64 @@ package flex.lang.reflect {
 		/**
 		 * Retrieves the <code>Class</code> associated with the <code>Field</code>
 		 * 
-		 * @return Associated <code>Class</code>, if any
+		 * @return Associated <code>Class</code>.
 		 */
 		public function get type():Class {
 			if (!_type) {
-				_type = Klass.getClassFromName( _fieldXML.@type );
+				var strType:String = _fieldXML.@type;
+				
+				if ( strType.length > 0 ) {
+					_type = Klass.getClassFromName( strType );
+				} else {
+					throw new TypeError("Unknown Type");
+				}
 			}
 			return _type;
 		}
 
+		/**
+		 * Compares two Field instances for equality
+		 * 
+		 * @return Returns boolean indicating equality
+		 * 
+		 */
+		public function equals( item:Field ):Boolean {
+			if ( !item ) {
+				return false;
+			}
+			
+			var equiv:Boolean = ( ( this.name == item.name ) && 
+				                  ( this.type == item.type ) &&
+								  ( this.isStatic == item.isStatic ) &&
+								  ( this.isProperty == item.isProperty ) &&
+								  ( this.definedBy == item.definedBy ) );
+
+			var localMetaData:Array = this.metadata;
+			var remoteMetaData:Array = item.metadata;
+			
+			if ( equiv ) {
+				var localLen:int = localMetaData?localMetaData.length:0;
+				var remoteLen:int = remoteMetaData?remoteMetaData.length:0;
+				
+				if ( localLen != remoteLen ) {
+					return false;
+				}
+				
+				if ( localLen > 0) {
+					for ( var i:int=0; i<localLen; i++ ) {
+						var localMeta:MetaDataAnnotation = localMetaData[ i ];
+						var remoteMeta:MetaDataAnnotation = remoteMetaData[ i ];
+						
+						equiv = localMeta.equals( remoteMeta );
+						if (!equiv) {
+							break;
+						}
+					}
+				}
+			}
+			
+			return equiv;
+		}		
 		/**
 		 * <code>Field</code> Constructor
 		 *
@@ -197,6 +272,14 @@ package flex.lang.reflect {
 		 * @param isProperty <code>true</code> if the <code>Field</code> is a property, else <code>false</code>
 		 */
 		public function Field( fieldXML:XML, isStatic:Boolean, definedBy:Class, isProperty:Boolean ) {
+			if ( !fieldXML ) {
+				throw new ArgumentError("Valid XML must be provided to Field Constructor");
+			}
+
+			if ( !definedBy ) {
+				throw new ArgumentError("Invalid owning class passed to Field Constructor");
+			}
+			
 			_fieldXML = fieldXML;
 			_name = fieldXML.@name;		
 			_isStatic = isStatic;	

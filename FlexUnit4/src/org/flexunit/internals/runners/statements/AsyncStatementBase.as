@@ -75,7 +75,12 @@ package org.flexunit.internals.runners.statements {
 				sentComplete = true;
 				parentToken.sendResult( error );
 			} else {
-				trace("Whoa... been asked to send another complete and I already did that");
+				if ( error && error.message ) {
+					trace("Token asked to send second result: " + error.message );	
+				} else {
+					trace("Token asked to send second result " );
+				}
+				
 			}
 			
 		}

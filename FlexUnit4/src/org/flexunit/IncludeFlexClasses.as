@@ -28,8 +28,6 @@
 package org.flexunit
 {
 	import org.flexunit.async.AsyncTestResponder;
-	import org.flexunit.async.ITestResponder;
-	import org.flexunit.async.TestResponder;
 	import org.flexunit.events.AsyncResponseEvent;
 	import org.flexunit.internals.TextListener;
 	import org.fluint.sequence.ISequenceAction;
@@ -45,7 +43,7 @@ package org.flexunit
 	import org.fluint.uiImpersonation.UIImpersonator;
 	import org.fluint.uiImpersonation.VisualTestEnvironmentBuilder;
 	import org.fluint.uiImpersonation.flex.FlexEnvironmentBuilder;
-	import org.fluint.uiImpersonation.flex.FlexVisualTestEnvironment;
+	import org.fluint.uiImpersonation.flex.FlexMXVisualTestEnvironment;
 
 	/**
 	 * These classes should only be included in a Flex project
@@ -53,8 +51,6 @@ package org.flexunit
 	public class IncludeFlexClasses
 	{
 		private var fxu1:AsyncTestResponder;
-		private var fxu2:ITestResponder;
-		private var fxu3:TestResponder;
 		private var fxu4:AsyncResponseEvent;
 		
 		private var flu1:ISequenceAction;
@@ -70,7 +66,7 @@ package org.flexunit
 		private var flu11:VisualTestEnvironmentBuilder;
 		
 		private var flu13:TextListener;
-		private var flu14:FlexVisualTestEnvironment;
+		private var flu14:FlexMXVisualTestEnvironment;
 		private var flu15:FlexEnvironmentBuilder;
 	}
 }

@@ -26,12 +26,18 @@
  * @version    
  **/ 
 package org.flexunit.runner {
+	import flash.display.DisplayObjectContainer;
+	import flash.display.LoaderInfo;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
+	import flash.events.IEventDispatcher;
 	import flash.utils.*;
 	
 	import org.flexunit.IncludeFlexClasses;
+	import org.flexunit.events.UnknownError;
 	import org.flexunit.experimental.theories.Theories;
+	import org.flexunit.internals.dependency.ExternalRunnerDependencyWatcher;
+	import org.flexunit.runner.external.IExternalDependencyRunner;
 	import org.flexunit.runner.notification.Failure;
 	import org.flexunit.runner.notification.IAsyncStartupRunListener;
 	import org.flexunit.runner.notification.IRunListener;
@@ -39,13 +45,19 @@ package org.flexunit.runner {
 	import org.flexunit.runner.notification.RunListener;
 	import org.flexunit.runner.notification.RunNotifier;
 	import org.flexunit.runner.notification.async.AsyncListenerWatcher;
-	import org.flexunit.token.AsyncListenersToken;
+	import org.flexunit.runners.Parameterized;
+	import org.flexunit.token.AsyncCoreStartupToken;
 	import org.flexunit.token.AsyncTestToken;
 	import org.flexunit.token.ChildResult;
 	import org.flexunit.utils.ClassNameUtil;
+	import org.fluint.uiImpersonation.VisualTestEnvironmentBuilder;
+
+	[Event(type="testsComplete", type="flash.events.Event")]
+	[Event(type="runnerStart", type="flash.events.Event")]
+	[Event(type="testsStopped", type="flash.events.Event")]
 
 	/**  
-	 * FlexUnit4 Version: 4.0.0b2<br/>
+	 * FlexUnit4 Version: 4.1.00<br/>
 	 * 
 	 * The <code>FlexUnitCore</code> is responsible for executing objects that implement an <code>IRequest</code>
 	 * interface.  There are several ways that the <code>IRequest</code> can be provided to the 
@@ -96,6 +108,13 @@ package org.flexunit.runner {
 		 * @private
 		 */
 		private var notifier:IRunNotifier;
+		
+		
+		/**
+		 * @private
+		 */
+		private var runnerExternalDependencyWatcher:ExternalRunnerDependencyWatcher;
+		
 		/**
 		 * @private
 		 */
@@ -104,8 +123,22 @@ package org.flexunit.runner {
 		/**
 		 * @private
 		 */
+		private var _visualDisplayRoot:DisplayObjectContainer;
+
+		/**
+		 * @private
+		 */
+		private var topLevelRunner:IRunner;
+		/**
+		 * @private
+		 */
+		private var runListener:RunListener;
+		/**
+		 * @private
+		 */
 		private static const RUN_LISTENER:String = "runListener";
 		public static const TESTS_COMPLETE : String = "testsComplete";
+		public static const TESTS_STOPPED : String = "testsStopped";
 		public static const RUNNER_START : String = "runnerStart";
 		public static const RUNNER_COMPLETE : String = "runnerComplete";
 
@@ -114,14 +147,55 @@ package org.flexunit.runner {
 		 * @private
 		 */
 		private var theory:Theories;
+		/**
+		 * @private
+		 */
+		private var params:Parameterized;
 		
 		/**
 		 * Returns the version number.
 		 */
 		public static function get version():String {
-			return "4.0.0rc1";
+			return "4.1.0";
+		}
+		
+		/**
+		 * Allows you to get or set the appropriate visualDisplayRoot for this test run.
+		 * 
+		 * Mainly used in ActionScript only projects to provide a reference to the main sprite
+		 * 
+		 */
+		public function get visualDisplayRoot():DisplayObjectContainer {
+			return _visualDisplayRoot; 
+		}
+		
+		/**
+		 * @private
+		 */
+		public function set visualDisplayRoot( value:DisplayObjectContainer ):void {
+			_visualDisplayRoot = value;
+
+			//pass the stage along to the VisualEnvironmentBuilder.. 
+			VisualTestEnvironmentBuilder.getInstance( value );
 		}
 
+		/**
+		 * Requests that the FlexUnitCore stop execution of the test environment.
+		 * As Flash Player is single threaded, we will only be able to stop execution after the currently running test completes
+		 * and before the next one begins, so this will always have a margin of error.
+		 */
+		public function pleaseStop():void {
+			
+			if ( topLevelRunner ) {
+				topLevelRunner.pleaseStop();
+			}
+
+			//dispatchEvent( new Event( TESTS_STOPPED ) );			
+		}
+
+		/**
+		 * @private
+		 */
 		private function dealWithArgArray( ar:Array, foundClasses:Array, missingClasses:Array ):void {
 			for ( var i:int=0; i<ar.length; i++ ) {
 				try {
@@ -158,9 +232,9 @@ package org.flexunit.runner {
 		 * <code>Request</code>, and that <code>Request</code> will be used for the test run.
 		 * 
 		 * @param args The arguments are provided for the test run.
-		 * @return a <code>Result</code> describing the details of the test run and the failed tests.
+		 * @return void.
 		 */
-		public function run( ...args ):Result {
+		public function run( ...args ):void {
 			var foundClasses:Array = new Array();
 			//Unlike JUnit, missing classes is probably unlikely here, but lets preserve the metaphor
 			//just in case
@@ -168,13 +242,14 @@ package org.flexunit.runner {
 			
 			dealWithArgArray( args, foundClasses, missingClasses );
 
-			var result:Result = runClasses.apply( this, foundClasses );
+			runClasses.apply( this, foundClasses );
 			
+			//This is kind of fake
+			//Need to tie this to the remaining result set
+			var result:Result = new Result();
 			for ( var i:int=0; i<missingClasses.length; i++ ) {
 				result.failures.push( missingClasses[ i ] );
 			}
-			
-			return result;
 		}
 
 		/**
@@ -185,6 +260,9 @@ package org.flexunit.runner {
 		 * @param args The class arguments that are provided for the test run.
 		 */
 		public function runClasses( ...args ):void {
+			//This is just an optimization for the case where we are passed an IRequest
+			//Otherwise it goes through the trouble of re-wrapping it in a suite.
+			//When that happens we end up with potential sorting and filtering issues
 			if ( args && ( args.length == 1 ) && args[ 0 ] is IRequest ) {
 				runRequest( args[ 0 ] );
 			} else {
@@ -216,22 +294,47 @@ package org.flexunit.runner {
 		 * @param runner The <code>IRunner</code> to use for this test run.
 		 */
 		public function runRunner( runner:IRunner ):void {
-			if ( asyncListenerWatcher.allListenersReady ) {
+
+			//Record the top level runner. This is the active runner in case we need to
+			//do something like stop the execution of the test run
+			topLevelRunner = runner;
+
+			if ( runner is IExternalDependencyRunner ) {
+				( runner as IExternalDependencyRunner ).dependencyWatcher = runnerExternalDependencyWatcher; 
+			}
+
+			if ( runnerExternalDependencyWatcher.allDependenciesResolved && asyncListenerWatcher.allListenersReady ) {
 				beginRunnerExecution( runner );
-			} else {
-				//we need to wait until all listeners are ready (or failed) before we can continue
-				var token:AsyncListenersToken = asyncListenerWatcher.startUpToken;
-				token.runner = runner;
-				token.addNotificationMethod( beginRunnerExecution );
+			} else {				
+				if ( !asyncListenerWatcher.allListenersReady ) {
+					//we need to wait until all listeners are ready (or failed) before we can continue
+					var tokenListeners:AsyncCoreStartupToken = asyncListenerWatcher.startUpToken;
+					tokenListeners.runner = runner;
+					tokenListeners.addNotificationMethod( verifyRunnerCanBegin );
+				}
+				
+				if ( !runnerExternalDependencyWatcher.allDependenciesResolved ) {
+					var tokenRunners:AsyncCoreStartupToken = runnerExternalDependencyWatcher.token;
+					tokenRunners.runner = runner;
+					tokenRunners.addNotificationMethod( verifyRunnerCanBegin );
+				} 
 			}
 		}
 		
+		/**
+		 * @private
+		 */
+		protected function verifyRunnerCanBegin( runner:IRunner ):void {
+			if ( runnerExternalDependencyWatcher.allDependenciesResolved && asyncListenerWatcher.allListenersReady ) {
+				beginRunnerExecution( runner );
+			}
+		}
 		/**
 		 * Starts the execution of the <code>IRunner</code>.
 		 */
 		protected function beginRunnerExecution( runner:IRunner ):void {
 			var result:Result = new Result();
-			var runListener:RunListener = result.createListener();
+			runListener = result.createListener();
 			addFirstListener( runListener );
 
 			var token:AsyncTestToken = new AsyncTestToken( ClassNameUtil.getLoggerFriendlyClassName( this ) );
@@ -257,9 +360,15 @@ package org.flexunit.runner {
 		 * All tests have finished execution.
 		 */
 		private function handleRunnerComplete( result:ChildResult ):void {
-			var runListener:RunListener = result.token[ RUN_LISTENER ];
+			var tokenRunListener:RunListener = result.token[ RUN_LISTENER ];
 
-			finishRun( runListener );
+			//Cleanup the top level runner
+			topLevelRunner = null;
+			
+			//Cleanup up runListener reference
+			runListener = null;
+
+			finishRun( tokenRunListener );
 		}
 		
 		/**
@@ -270,10 +379,53 @@ package org.flexunit.runner {
 		private function finishRun( runListener:RunListener ):void {
 			notifier.fireTestRunFinished( runListener.result );
 			removeListener( runListener );
-			
+				
+			//Consider making this a custom event and attaching the result set
 			dispatchEvent( new Event( TESTS_COMPLETE ) );
 		}
 
+		/**
+		 * Adds a generic listener for errors. In practice this is used to catch global
+		 * errors to ensure that, if a developer does not properly code an async test
+		 * using FlexUnit APIs, that the player is not stopped by a message dialog
+		 * Receiving this top level error is *very* bad and causes an immediate stop.
+		 *
+		 * @param listener the listener to add
+		 * @see org.flexunit.runner.notification.RunListener
+		 */
+		public function addUncaughtErrorListener(loaderInfo:LoaderInfo, priority:int = 1):void {
+			//dereferencing this anonymously so we don't have problems with other
+			//FP versions
+			
+			if (loaderInfo.hasOwnProperty("uncaughtErrorEvents")) {
+				IEventDispatcher(loaderInfo["uncaughtErrorEvents"]).addEventListener("uncaughtError", uncaughtErrorHandler, false, priority);
+			}
+		}
+		
+		/**
+		 * @private
+		 */
+		private function uncaughtErrorHandler( event:Event ):void {
+			//We received a top level error here... this is most likely because
+			//someone screwed up an async call, however, even in that case
+			//we have limited ways to figure out why. we need to stop all 
+			//of the tests immediately.
+			event.preventDefault();
+
+			var unknownError:UnknownError = new UnknownError( event );
+			var description:IDescription = Description.createTestDescription( UnknownError, "Uncaught Top Level Exception" );
+			var failure:Failure = new Failure( description, unknownError );
+			
+			notifier.fireTestFailure( failure );
+			notifier.fireTestRunFinished( runListener.result );
+
+			//Kill all listeners so they get no further events
+			notifier.removeAllListeners();
+
+			//Issue the pleaseStop to make the runners stop execution
+			pleaseStop();
+		}
+		
 		/**
 		 * Add a listener to be notified as the tests run.
 		 * @param listener the listener to add
@@ -286,6 +438,9 @@ package org.flexunit.runner {
 			}
 		}
 
+		/**
+		 * @private
+		 */
 		private function addFirstListener( listener:IRunListener ):void {
 			notifier.addFirstListener( listener );
 			if ( listener is IAsyncStartupRunListener ) {
@@ -305,18 +460,15 @@ package org.flexunit.runner {
 			}			
 		}
 		
-		protected function handleAllListenersReady( event:Event ):void {
-			
-		}
-		
 		/**
 		 * Create a new <code>FlexUnitCore</code> to run tests.
 		 */
 		public function FlexUnitCore() {
 			notifier = new RunNotifier();
+
+			runnerExternalDependencyWatcher = new ExternalRunnerDependencyWatcher();
 			
 			asyncListenerWatcher = new AsyncListenerWatcher( notifier, null );
-			//asyncListenerWatcher.addEventListener( AsyncListenerWatcher.ALL_LISTENERS_READY, handleAllListenersReady, false, 0, true );
 		}
 	}
 }

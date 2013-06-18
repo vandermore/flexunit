@@ -26,6 +26,8 @@
  * @version    
  **/ 
 package org.flexunit.internals.runners.statements {
+	import org.flexunit.async.AsyncLocator;
+	import org.flexunit.constants.AnnotationConstants;
 	import org.flexunit.internals.runners.statements.IAsyncStatement;
 	import org.flexunit.internals.runners.statements.SequencerWithDecoration;
 	import org.flexunit.runners.model.FrameworkMethod;
@@ -41,8 +43,15 @@ package org.flexunit.internals.runners.statements {
 		 * @inheritDoc
 		 */
 		override protected function withPotentialAsync( method:FrameworkMethod, test:Object, statement:IAsyncStatement ):IAsyncStatement {
-			var async:Boolean = ExpectAsync.hasAsync( method, "Before" );
-			return async ? new ExpectAsync( test, statement ) : statement;
+			var async:Boolean = ExpectAsync.hasAsync( method, AnnotationConstants.BEFORE );
+
+			var needsMonitor:Boolean = false;
+			//Do we already have an ExpectAsync instance for this class?
+			if ( async ) {
+				needsMonitor = ( !AsyncLocator.hasCallableForTest( test ) );
+			}
+			
+			return ( async && needsMonitor ) ? new ExpectAsync( test, statement ) : statement;
 		}
 		
 		/**
@@ -51,7 +60,7 @@ package org.flexunit.internals.runners.statements {
 		 * @param befores An array containing all statements that need to be executed before a test is executed.
 		 * @param target The test class.
 		 */
-		public function RunBefores( befores:Array, target:Object ) {
+		public function RunBefores( befores:Array, target:Object, statement:IAsyncStatement=null ) {
 			super( befores, target );
 		}
 

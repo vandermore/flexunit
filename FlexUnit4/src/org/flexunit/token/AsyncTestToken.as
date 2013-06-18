@@ -42,11 +42,8 @@ package org.flexunit.token {
 		/**
 		 * @private
 		 */
-		private var methodsEntries:Array;
-		/**
-		 * @private
-		 */
-		private var _error:Error;
+		//private var methodsEntries:Array;
+		private var notificationMethod:Function;
 		/**
 		 * @private
 		 */
@@ -68,13 +65,6 @@ package org.flexunit.token {
 		}
 		
 		/**
-		 * Returns the error associated with the <code>AsyncTestToken</code>.
-		 */
-		public function get error():Error {
-			return _error;
-		}
-		
-		/**
 		 * Adds a notification <code>method</code> to the <code>AsyncTestToken</code> and returns the token.
 		 * 
 		 * @param method A <code>Function</code> that will be invoked when results are sent.
@@ -83,11 +73,12 @@ package org.flexunit.token {
 		 * @return this <code>AsyncTestToken</code> with the added <code>method</code>.
 		 */
 		public function addNotificationMethod( method:Function, debugClassName:String=null ):IAsyncTestToken {
-			if (methodsEntries == null)
+			notificationMethod = method;
+/*			if (methodsEntries == null)
 				methodsEntries = [];
 	
 			methodsEntries.push( new MethodEntry( method, debugClassName?debugClassName:this.debugClassName ) );			
-
+*/
 			return this;
 		}
 		
@@ -99,9 +90,9 @@ package org.flexunit.token {
 		 * @return a <code>ChildResult</code> using this <code>AsynctestToken</code> and the provided <code>error</code>.
 		 */
 		private function createChildResult( error:Error ):ChildResult {
-			if ( error ) {
+/*			if ( error ) {
 				//trace("break here");
-			}
+			}*/
 			return new ChildResult( this, error );
 		}
 		
@@ -112,16 +103,16 @@ package org.flexunit.token {
 		 * @parameter error The error to be provided to the <code>ChildResult</code>.
 		 */
 		public function sendResult( error:Error=null ):void {
-			if ( methodsEntries && methodsEntries[ 0 ] ) {
+			if ( notificationMethod != null ) {
+				notificationMethod( createChildResult( error ) );
+			}
+			
+/*			if ( methodsEntries && methodsEntries[ 0 ] ) {
 				//Right now we only really have 1 level of responders
 				//this is more just for debugging to see a cleaner stack trace
 				methodsEntries[ 0 ].method( createChildResult( error ) );
-				
-				/*for ( var i:int=0; i<methodsEntries.length; i++ ) {
-					methodsEntries[ i ].method( createChildResult( error ) );
-				}*/
 			}
-		}
+*/		}
 		
 		/**
 		 * Returns a string that inculdes the <code>debugClassName</code>, if it exists, and the
@@ -135,11 +126,11 @@ package org.flexunit.token {
 				output += ( debugClassName + ": " );
 			}
 			
-			if ( methodsEntries ) {
+/*			if ( methodsEntries ) {
 				numEntries = methodsEntries.length;
 			}
-			
-			output += ( numEntries + " listeners" );
+*/			
+			output += ( String( notificationMethod!=null?1:0 ) + " listeners" );
 			
 			return output; 
 		}

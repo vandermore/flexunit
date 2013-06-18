@@ -26,6 +26,8 @@
  * @version    
  **/ 
 package org.flexunit.internals.runners.statements {
+	import org.flexunit.async.AsyncLocator;
+	import org.flexunit.constants.AnnotationConstants;
 	import org.flexunit.internals.runners.statements.IAsyncStatement;
 	import org.flexunit.internals.runners.statements.SequencerWithDecoration;
 	import org.flexunit.runners.model.FrameworkMethod;
@@ -41,8 +43,14 @@ package org.flexunit.internals.runners.statements {
 		 * @inheritDoc
 		 */
 		override protected function withPotentialAsync( method:FrameworkMethod, test:Object, statement:IAsyncStatement ):IAsyncStatement {
-			var async:Boolean = ExpectAsync.hasAsync( method, "BeforeClass" );
-			return async ? new ExpectAsync( test, statement ) : statement;
+			var async:Boolean = ExpectAsync.hasAsync( method, AnnotationConstants.BEFORE_CLASS );
+			var needsMonitor:Boolean = false;
+			//Do we already have an ExpectAsync instance for this class?
+			if ( async ) {
+				needsMonitor = ( !AsyncLocator.hasCallableForTest( test ) );
+			}
+
+			return ( async && needsMonitor ) ? new ExpectAsync( test, statement ) : statement;
 		}
 		
 		/**
